@@ -1,0 +1,46 @@
+flowchart TD
+    subgraph Submit["02 · Submit"]
+        A[Paste raw agreement text] --> B[Chunk into ~2000-char sections<br/>at paragraph boundaries]
+    end
+
+    subgraph Engine["AI Comparison Engine — one API call per chunk"]
+        B --> C[AI segments chunk into discrete<br/>legal provisions — not sentence-level,<br/>not whole-paragraph-level]
+        C --> D{For each provision:<br/>compare meaning against<br/>category baseline}
+        D -->|Semantically equivalent| E[matches baseline<br/>no rating needed]
+        D -->|Materially new/different| F[new<br/>+ Impact rating<br/>+ Prevalence rating<br/>+ rationale + confidence]
+        F -.->|stop_reason: max_tokens| G[Self-healing retry:<br/>split chunk in half,<br/>retry each half]
+        G -.-> C
+    end
+
+    E --> H[(Clause record<br/>matchStatus: matches baseline)]
+    F --> I[(Clause record<br/>matchStatus: new, disposition: pending)]
+
+    H --> J[Digest generation<br/>2nd AI call: synthesize what<br/>actually deserves attention]
+    I --> J
+
+    J --> K{03 · Review}
+    J --> L{04 · Compare}
+
+    K --> M[Needs attention:<br/>Unusual, or Medium/High/<br/>Undetermined Risk]
+    K --> N[Low-priority cluster:<br/>Standard + Low/Inconsequential<br/>— group or individual, user's choice]
+    M --> O{Accept / Not Accept}
+    N --> O
+
+    O -->|Accepted| P[(Baseline Entry created<br/>text + source citation + date)]
+    O -->|Not Accepted| Q[(Logged as Not Accepted<br/>excluded from baseline)]
+
+    P --> R[01 · Baseline / Control Group]
+    R -->|used as comparison target for| D
+
+    R --> S{Remove a baseline entry?}
+    S -->|Default: keep matches| T[Every clause elsewhere that had<br/>matched this entry becomes its<br/>own independent baseline entry<br/>— a match already equals acceptance]
+    S -->|Explicit opt-in: discard too| U[Those clauses revert to<br/>new / pending re-review<br/>Undetermined Risk placeholder]
+    T --> R
+    U --> K
+
+    style E fill:#3F6B4A,color:#fff
+    style F fill:#A6791F,color:#fff
+    style P fill:#3F6B4A,color:#fff
+    style Q fill:#8B3A3A,color:#fff
+    style T fill:#3F6B4A,color:#fff
+    style U fill:#A63A2E,color:#fff
